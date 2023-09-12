@@ -79,7 +79,7 @@ public:
 
 	bool visit(MemberAccess const& _memberAccess) override;
 	void endVisit(MemberAccess const& _memberAccess) override;
-	bool visit(ElementaryTypeNameExpression const& _expression) override;
+	bool visit(BuiltinDefinition const& _builtinDefinition) override;
 
 	bool visit(TypeClassDefinition const& _typeClassDefinition) override;
 	bool visit(TypeClassInstantiation const& _typeClassInstantiation) override;

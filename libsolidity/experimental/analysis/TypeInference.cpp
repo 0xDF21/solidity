@@ -110,22 +110,6 @@ TypeInference::TypeInference(Analysis& _analysis):
 	m_unitType = m_typeSystem.type(PrimitiveType::Unit, {});
 	m_boolType = m_typeSystem.type(PrimitiveType::Bool, {});
 	m_env = &m_typeSystem.env();
-
-	{
-		auto [members, newlyInserted] = annotation().members.emplace(m_typeSystem.constructor(PrimitiveType::Bool), std::map<std::string, TypeMember>{});
-		solAssert(newlyInserted);
-		members->second.emplace("abs", TypeMember{helper.functionType(m_wordType, m_boolType)});
-		members->second.emplace("rep", TypeMember{helper.functionType(m_boolType, m_wordType)});
-	}
-	{
-		Type first = m_typeSystem.freshTypeVariable({});
-		Type second = m_typeSystem.freshTypeVariable({});
-		Type pairType = m_typeSystem.type(PrimitiveType::Pair, {first, second});
-		auto [members, newlyInserted] = annotation().members.emplace(m_typeSystem.constructor(PrimitiveType::Pair), std::map<std::string, TypeMember>{});
-		solAssert(newlyInserted);
-		members->second.emplace("first", TypeMember{helper.functionType(pairType, first)});
-		members->second.emplace("second", TypeMember{helper.functionType(pairType, second)});
-	}
 }
 
 bool TypeInference::analyze(SourceUnit const& _sourceUnit)
@@ -292,46 +276,10 @@ bool TypeInference::visit(InlineAssembly const& _inlineAssembly)
 	return false;
 }
 
-bool TypeInference::visit(ElementaryTypeNameExpression const& _expression)
+bool TypeInference::visit(BuiltinDefinition const&)
 {
-	auto& expressionAnnotation = annotation(_expression);
-	solAssert(!expressionAnnotation.type);
-
-	switch (m_expressionContext)
-	{
-	case ExpressionContext::Term:
-	case ExpressionContext::Type:
-		if (auto constructor = m_analysis.annotation<TypeRegistration>(_expression).typeConstructor)
-		{
-			std::vector<Type> arguments;
-			std::generate_n(std::back_inserter(arguments), m_typeSystem.constructorInfo(*constructor).arguments(), [&]() {
-				return m_typeSystem.freshTypeVariable({});
-			});
-			// TODO: get rid of the distinction (assign a function on unit for the empty case)? Ambiguity?
-			if (arguments.empty() || m_expressionContext == ExpressionContext::Term)
-				expressionAnnotation.type = m_typeSystem.type(*constructor, arguments);
-			else
-			{
-				TypeSystemHelpers helper{m_typeSystem};
-				expressionAnnotation.type =
-					helper.typeFunctionType(
-						helper.tupleType(arguments),
-						m_typeSystem.type(*constructor, arguments)
-					);
-			}
-		}
-		else
-		{
-			m_errorReporter.typeError(4107_error, _expression.location(), "No type constructor registered for elementary type name.");
-			expressionAnnotation.type = m_typeSystem.freshTypeVariable({});
-		}
-		break;
-	case ExpressionContext::Sort:
-		m_errorReporter.typeError(2024_error, _expression.location(), "Elementary type name expression not supported in sort context.");
-		expressionAnnotation.type = m_typeSystem.freshTypeVariable({});
-		break;
-	}
-	return false;
+	// Nothing to do here. Defined only to avoid fatal error in visitNode().
+	return true;
 }
 
 bool TypeInference::visit(BinaryOperation const& _binaryOperation)
@@ -810,6 +758,8 @@ void TypeInference::endVisit(MemberAccess const& _memberAccess)
 
 bool TypeInference::visit(TypeDefinition const& _typeDefinition)
 {
+	bool isBuiltIn = dynamic_cast<BuiltinDefinition const*>(_typeDefinition.typeExpression());
+
 	TypeSystemHelpers helper{m_typeSystem};
 	auto& typeDefinitionAnnotation = annotation(_typeDefinition);
 	if (typeDefinitionAnnotation.type)
@@ -817,14 +767,6 @@ bool TypeInference::visit(TypeDefinition const& _typeDefinition)
 
 	if (_typeDefinition.arguments())
 		_typeDefinition.arguments()->accept(*this);
-
-	std::optional<Type> underlyingType;
-	if (_typeDefinition.typeExpression())
-	{
-		ScopedSaveAndRestore expressionContext{m_expressionContext, ExpressionContext::Type};
-		_typeDefinition.typeExpression()->accept(*this);
-		underlyingType = annotation(*_typeDefinition.typeExpression()).type;
-	}
 
 	std::vector<Type> arguments;
 	if (_typeDefinition.arguments())
@@ -837,6 +779,20 @@ bool TypeInference::visit(TypeDefinition const& _typeDefinition)
 	else
 		typeDefinitionAnnotation.type = helper.typeFunctionType(helper.tupleType(arguments), definedType);
 
+	std::optional<Type> underlyingType;
+
+	if (_typeDefinition.typeExpression())
+	{
+		ScopedSaveAndRestore expressionContext{m_expressionContext, ExpressionContext::Type};
+		_typeDefinition.typeExpression()->accept(*this);
+
+		if (!isBuiltIn)
+			underlyingType = annotation(*_typeDefinition.typeExpression()).type;
+		else if (helper.isPrimitiveType(definedType, PrimitiveType::Bool))
+			// TODO: This special case should eventually become user-definable.
+			underlyingType = m_wordType;
+	}
+
 	TypeConstructor constructor = typeConstructor(&_typeDefinition);
 	auto [members, newlyInserted] = annotation().members.emplace(constructor, std::map<std::string, TypeMember>{});
 	solAssert(newlyInserted, fmt::format("Members of type '{}' are already defined.", m_typeSystem.constructorInfo(constructor).name));
@@ -845,6 +801,15 @@ bool TypeInference::visit(TypeDefinition const& _typeDefinition)
 		members->second.emplace("abs", TypeMember{helper.functionType(*underlyingType, definedType)});
 		members->second.emplace("rep", TypeMember{helper.functionType(definedType, *underlyingType)});
 	}
+
+	if (helper.isPrimitiveType(definedType, PrimitiveType::Pair))
+	{
+		solAssert(isBuiltIn);
+		solAssert(arguments.size() == 2);
+		members->second.emplace("first", TypeMember{helper.functionType(definedType, arguments[0])});
+		members->second.emplace("second", TypeMember{helper.functionType(definedType, arguments[1])});
+	}
+
 	return false;
 }
 
