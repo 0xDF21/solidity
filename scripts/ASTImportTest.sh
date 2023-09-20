@@ -179,28 +179,25 @@ function split_combined_json
 {
     local json_file="$1"
     local output_path="$2"
-    local prefix="${3:-}"
-    for path_with_contract in $(jq '.contracts | keys | .[]' "${json_file}" 2> /dev/null)
+    local path_to_contract_file="${3:-}"
+    for path_with_contract in $(jq --raw-output '.contracts | keys | .[]' "${json_file}" 2> /dev/null)
     do
-        local path=${path_with_contract}
         local contract=""
-        local delimiter
-        delimiter=$("${EXPR}" index "${path}" ":") || true
-        if [[ -z "${prefix}" ]]
+        if [[ -z "${path_to_contract_file}" ]]
         then
-            path=${path_with_contract:0:((${delimiter} - 1))}
-            contract=${path_with_contract:((${delimiter})):((${#path_with_contract} - ${delimiter} - 1))}
+            local delimiter
+            delimiter=$("${EXPR}" index "${path_with_contract}" ":") || true
+            contract=${path_with_contract:((${delimiter})):((${#path_with_contract} - ${delimiter}))}
         else
-            path=${path_with_contract}
-            contract=""
+            contract="${path_to_contract_file}"
         fi
-        for type in $(jq --raw-output ".contracts.${path_with_contract} | keys | .[]" "${json_file}" 2> /dev/null)
+        for type in $(jq --raw-output ".contracts.\"${path_with_contract}\" | keys | .[]" "${json_file}" 2> /dev/null)
         do
             local output
-            output=$(jq --raw-output ".contracts.${path_with_contract}.\"${type}\"" "${json_file}")
+            output=$(jq --raw-output ".contracts.\"${path_with_contract}\".\"${type}\"" "${json_file}")
             if [[ -n "${output}" ]]
             then
-              echo "${output}" > "${output_path}/${prefix}${contract}.${type}"
+                echo "${output}" > "${output_path}/${contract}.${type}"
             fi
         done
     done
@@ -251,7 +248,7 @@ function test_evmjson_via_ir_and_yul_import_export
 
     mkdir yul
     # export found solidity contracts to yul.
-    run_solc --optimize --via-ir --ir-optimized "${input_files[@]}" --no-optimize-yul  -o yul/
+    run_solc --optimize --via-ir --ir-optimized "${input_files[@]}" --no-optimize-yul -o yul
     for filename in yul/*
     do
         if [[ -s "${filename}" ]]
