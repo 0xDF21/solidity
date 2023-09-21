@@ -5,7 +5,6 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parents[3]
-CMDLINE_TEST_DIR = PROJECT_ROOT / "test/cmdlineTests"
 
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 #pylint: disable=wrong-import-position
@@ -21,7 +20,7 @@ from splitSources import split_sources
 def test_bytecode_equivalence():
     tmp_dir = Path(os.getcwd())
 
-    source_file_path = CMDLINE_TEST_DIR / "~bytecode_equivalence_multiple_sources/inputs.sol"
+    source_file_path = Path(os.path.dirname(__file__)) / "inputs.sol"
     split_sources(source_file_path, True)
 
     # Compiling multiple files at same time should not affect bytecode generation although it changes AST IDs.
