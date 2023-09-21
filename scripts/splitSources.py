@@ -51,7 +51,7 @@ def writeSourceToFile(lines):
 
     return [srcName]
 
-def split_sources(filePath):
+def split_sources(filePath, suppress_output = False):
     sys.excepthook = uncaught_exception_hook
 
     try:
@@ -62,7 +62,8 @@ def split_sources(filePath):
             srcString = ""
             for src in writeSourceToFile(lines):
                 srcString += src + ' '
-            print(srcString)
+            if not suppress_output:
+                print(srcString)
             return 0
         return 1
 

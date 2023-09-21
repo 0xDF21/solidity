@@ -22,7 +22,7 @@ def test_bytecode_equivalence():
     tmp_dir = Path(os.getcwd())
 
     source_file_path = CMDLINE_TEST_DIR / "~bytecode_equivalence_multiple_sources/inputs.sol"
-    split_sources(source_file_path)
+    split_sources(source_file_path, True)
 
     # Compiling multiple files at same time should not affect bytecode generation although it changes AST IDs.
     a_bytecode_path = tmp_dir / "A.bytecode"
