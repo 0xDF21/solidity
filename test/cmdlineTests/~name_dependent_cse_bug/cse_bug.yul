@@ -24,9 +24,8 @@ object "C" {
             function f(x) -> r {}
 
             function avg(x, y) -> var {
-                // In the other file `_1` is called `_2`.
-                let _1 := add(x, y)
-                var := add(_1, _1)
+                let __placeholder__ := add(x, y)
+                var := add(__placeholder__, __placeholder__)
             }
 
             function cadd(x, y) -> sum {
