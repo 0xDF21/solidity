@@ -3,39 +3,27 @@ object "C" {
 
     object "C_deployed" {
         code {
-            sstore(0, main(sload(0), sload(0), sload(0), sload(0)))
+            main(0, 0)
 
-            function main(a, d, b, c) -> v {
+            function main(a, b) {
                 for {} 1 {}
                 {
-                    if iszero(b) { break }
+                    if iszero(a) { break }
 
-                    let mid := avg(b, c)
-                    switch gt(1, c)
+                    let mid := avg(a, a)
+                    switch a
                     case 0 {
-                        b := cadd(mid, 0)
+                        a := mid
                     }
                     default {
-                        sstore(0x20, mid)
+                        sstore(0, mid)
                     }
                 }
             }
-
-            function f(x) -> r {}
 
             function avg(x, y) -> var {
                 let __placeholder__ := add(x, y)
                 var := add(__placeholder__, __placeholder__)
-            }
-
-            function cadd(x, y) -> sum {
-                sum := add(x, y)
-
-                if gt(0, sum) {
-                    mstore(0, 0)
-                    mstore(0, 0)
-                    revert(0, 0)
-                }
             }
         }
     }
